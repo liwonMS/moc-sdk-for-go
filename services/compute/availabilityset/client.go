@@ -5,9 +5,11 @@ package availabilityset
 
 import (
 	"context"
+	"time"
 
 	"github.com/microsoft/moc-sdk-for-go/services/compute"
 	"github.com/microsoft/moc/pkg/auth"
+	"github.com/microsoft/moc/pkg/errors"
 )
 
 type Service interface {
@@ -37,7 +39,18 @@ func (c *AvailabilitySetClient) Get(ctx context.Context, group, name string) (*[
 
 // CreateOrUpdate methods invokes create or update on the client
 func (c *AvailabilitySetClient) Create(ctx context.Context, group, name string, compute *compute.AvailabilitySet) (*compute.AvailabilitySet, error) {
-	return c.internal.Create(ctx, group, name, compute)
+	for {
+		avset, err := c.internal.Create(ctx, group, name, compute)
+		if err != nil {
+			if errors.IsInvalidVersion(err) {
+				// Retry only on invalid version
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			return nil, err
+		}
+		return avset, err
+	}
 }
 
 // Delete methods invokes delete of the compute resource
